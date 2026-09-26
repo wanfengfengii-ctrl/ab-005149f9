@@ -1,0 +1,29 @@
+services:
+  web:
+    build: .
+    image: rigging-adjudicator-web
+    ports:
+      # 宿主机端口可通过环境变量 WEB_PORT 配置，默认 8080
+      - "${WEB_PORT:-8080}:80"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 5s
+    restart: unless-stopped
+
+  # 一次性服务：完成代码测试、构建、对已启动页面健康端点与裁决业务模块的冒烟后，
+  # 自行退出并以退出码报告结果（0 = 全部通过）。
+  verify:
+    build:
+      context: .
+      target: verify
+    image: rigging-adjudicator-verify
+    depends_on:
+      web:
+        condition: service_healthy
+    environment:
+      WEB_SMOKE_URL: http://web:80
+    command: ["sh", "scripts/verify.sh"]
+    restart: "no"
